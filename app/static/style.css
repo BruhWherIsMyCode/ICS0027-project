@@ -95,6 +95,27 @@ button.link {
   align-items: center;
 }
 
+.search {
+  display: flex;
+  gap: 8px;
+}
+
+.search input {
+  flex: 1;
+}
+
+.actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+button.danger {
+  margin-top: 8px;
+  background: #b42318;
+}
+
 .entries {
   padding: 0;
   list-style: none;

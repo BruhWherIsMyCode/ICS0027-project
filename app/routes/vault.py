@@ -51,12 +51,16 @@ def get_entry(db: DbSession, entry_id: str, user_id: int) -> Entry:
 @router.get("/vault")
 def vault(
     request: Request,
+    q: str = "",
     session: Session = Depends(require_user),
     db: DbSession = Depends(get_db),
 ):
-    query = select(Entry).where(Entry.owner_id == session.user_id).order_by(Entry.title)
-    entries = db.scalars(query).all()
-    return templates.TemplateResponse(request, "vault.html", {"entries": entries})
+    query = select(Entry).where(Entry.owner_id == session.user_id)
+    if q:
+        matches = Entry.title.icontains(q, autoescape=True) | Entry.url.icontains(q, autoescape=True)
+        query = query.where(matches)
+    entries = db.scalars(query.order_by(Entry.title)).all()
+    return templates.TemplateResponse(request, "vault.html", {"entries": entries, "q": q})
 
 
 @router.get("/vault/new")
@@ -108,3 +112,60 @@ def view_entry(
     secret = crypto.decrypt(session.key, entry.nonce, entry.ciphertext, entry.id)
     context = {"entry": entry, "secret": secret}
     return templates.TemplateResponse(request, "entry.html", context)
+
+
+@router.get("/vault/{entry_id}/edit")
+def edit_entry_form(
+    request: Request,
+    entry_id: str,
+    session: Session = Depends(require_user),
+    db: DbSession = Depends(get_db),
+):
+    entry = get_entry(db, entry_id, session.user_id)
+    secret = crypto.decrypt(session.key, entry.nonce, entry.ciphertext, entry.id)
+    values = {"title": entry.title, "url": entry.url, **secret}
+    context = {"heading": "Edit entry", "action": f"/vault/{entry.id}/edit", "values": values}
+    return templates.TemplateResponse(request, "entry_form.html", context)
+
+
+@router.post("/vault/{entry_id}/edit")
+def update_entry(
+    request: Request,
+    entry_id: str,
+    form: Annotated[EntryForm, Form()],
+    session: Session = Depends(require_user),
+    db: DbSession = Depends(get_db),
+):
+    entry = get_entry(db, entry_id, session.user_id)
+    error = validate(request, form)
+    if error:
+        context = {
+            "heading": "Edit entry",
+            "action": f"/vault/{entry.id}/edit",
+            "values": form.model_dump(),
+            "error": error,
+        }
+        return templates.TemplateResponse(request, "entry_form.html", context, status_code=400)
+
+    entry.title = form.title.strip()
+    entry.url = form.url.strip()
+    entry.nonce, entry.ciphertext = crypto.encrypt(session.key, secret_fields(form), entry.id)
+    db.commit()
+    return RedirectResponse(f"/vault/{entry.id}", status_code=303)
+
+
+@router.post("/vault/{entry_id}/delete")
+def delete_entry(
+    request: Request,
+    entry_id: str,
+    csrf_token: str = Form(),
+    session: Session = Depends(require_user),
+    db: DbSession = Depends(get_db),
+):
+    entry = get_entry(db, entry_id, session.user_id)
+    if not sessions.csrf_valid(request, csrf_token):
+        raise HTTPException(status_code=400)
+
+    db.delete(entry)
+    db.commit()
+    return RedirectResponse("/vault", status_code=303)

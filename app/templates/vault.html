@@ -4,6 +4,10 @@
   <h1>Your vault</h1>
   <a class="button" href="/vault/new">New entry</a>
 </div>
+<form method="get" action="/vault" class="search">
+  <input type="search" name="q" value="{{ q }}" maxlength="200" placeholder="Search by title or URL">
+  <button type="submit">Search</button>
+</form>
 {% if entries %}
   <ul class="entries">
     {% for entry in entries %}
@@ -13,6 +17,8 @@
       </li>
     {% endfor %}
   </ul>
+{% elif q %}
+  <p class="muted">No entries match "{{ q }}".</p>
 {% else %}
   <p class="muted">No entries yet.</p>
 {% endif %}

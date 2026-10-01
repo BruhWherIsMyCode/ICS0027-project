@@ -22,5 +22,15 @@
   <dt>Notes</dt>
   <dd class="notes">{{ secret.notes }}</dd>
 </dl>
+<div class="actions">
+  <a class="button" href="/vault/{{ entry.id }}/edit">Edit</a>
+  <details>
+    <summary>Delete</summary>
+    <form method="post" action="/vault/{{ entry.id }}/delete">
+      <input type="hidden" name="csrf_token" value="{{ request.state.session.csrf_token }}">
+      <button type="submit" class="danger">Yes, delete this entry</button>
+    </form>
+  </details>
+</div>
 <p><a href="/vault">Back to vault</a></p>
 {% endblock %}
