@@ -7,8 +7,21 @@
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+  {% set session = request.state.session %}
   <header>
     <a class="brand" href="/">Password Manager</a>
+    <nav>
+      {% if session.user_id %}
+        <span>{{ session.username }}</span>
+        <form method="post" action="/logout">
+          <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+          <button type="submit" class="link">Log out</button>
+        </form>
+      {% else %}
+        <a href="/login">Log in</a>
+        <a href="/register">Register</a>
+      {% endif %}
+    </nav>
   </header>
   <main>
     {% block content %}{% endblock %}

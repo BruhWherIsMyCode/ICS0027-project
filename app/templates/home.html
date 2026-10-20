@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
 <h1>Password Manager</h1>
-<p>Login and registration are coming soon.</p>
+{% if request.state.session.user_id %}
+  <p>You are logged in. The vault is coming soon.</p>
+{% else %}
+  <p><a href="/login">Log in</a> or <a href="/register">create an account</a>.</p>
+{% endif %}
 {% endblock %}

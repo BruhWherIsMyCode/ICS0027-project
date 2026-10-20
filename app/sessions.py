@@ -8,6 +8,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app import config
 
 COOKIE_NAME = "__Host-session"
+MAX_FAILED_LOGINS = 5
+LOCKOUT_SECONDS = 15 * 60
 
 
 @dataclass
@@ -21,6 +23,8 @@ class Session:
 
 
 sessions: dict[str, Session] = {}
+failed_logins: dict[str, list[float]] = {}
+locked_until: dict[str, float] = {}
 
 
 def is_expired(session: Session, now: float) -> bool:
@@ -66,6 +70,24 @@ def set_cookie(response, sid: str):
 def csrf_valid(request: Request, token: str) -> bool:
     expected = request.state.session.csrf_token
     return secrets.compare_digest(expected.encode(), token.encode())
+
+
+def is_locked(username: str) -> bool:
+    return locked_until.get(username, 0) > time.time()
+
+
+def record_failed_login(username: str):
+    now = time.time()
+    recent = [t for t in failed_logins.get(username, []) if now - t < LOCKOUT_SECONDS]
+    recent.append(now)
+    failed_logins[username] = recent
+    if len(recent) >= MAX_FAILED_LOGINS:
+        locked_until[username] = now + LOCKOUT_SECONDS
+        failed_logins.pop(username)
+
+
+def clear_failed_logins(username: str):
+    failed_logins.pop(username, None)
 
 
 class SessionMiddleware(BaseHTTPMiddleware):

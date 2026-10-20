@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Create account</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post" action="/register" class="card">
+  <input type="hidden" name="csrf_token" value="{{ request.state.session.csrf_token }}">
+  <label>Username
+    <input name="username" value="{{ username }}" required minlength="3" maxlength="32" autocomplete="username">
+  </label>
+  <label>Master password
+    <input type="password" name="password" required minlength="12" maxlength="1024" autocomplete="new-password">
+  </label>
+  <label>Repeat master password
+    <input type="password" name="confirm" required minlength="12" maxlength="1024" autocomplete="new-password">
+  </label>
+  <p class="muted">There is no password recovery. If you forget the master password, your entries are lost.</p>
+  <button type="submit">Create account</button>
+</form>
+{% endblock %}
