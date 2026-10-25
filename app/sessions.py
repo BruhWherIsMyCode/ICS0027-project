@@ -2,7 +2,7 @@ import secrets
 import time
 from dataclasses import dataclass, field
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app import config
@@ -70,6 +70,13 @@ def set_cookie(response, sid: str):
 def csrf_valid(request: Request, token: str) -> bool:
     expected = request.state.session.csrf_token
     return secrets.compare_digest(expected.encode(), token.encode())
+
+
+def require_user(request: Request) -> Session:
+    session = request.state.session
+    if session.user_id is None:
+        raise HTTPException(status_code=303, headers={"Location": "/login"})
+    return session
 
 
 def is_locked(username: str) -> bool:

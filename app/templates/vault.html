@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="toolbar">
+  <h1>Your vault</h1>
+  <a class="button" href="/vault/new">New entry</a>
+</div>
+{% if entries %}
+  <ul class="entries">
+    {% for entry in entries %}
+      <li>
+        <a href="/vault/{{ entry.id }}">{{ entry.title }}</a>
+        {% if entry.url %}<span class="muted">{{ entry.url }}</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="muted">No entries yet.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ entry.title }}</h1>
+<dl class="card">
+  <dt>URL</dt>
+  <dd>
+    {% if entry.url.startswith(("http://", "https://")) %}
+      <a href="{{ entry.url }}" rel="noopener noreferrer" target="_blank">{{ entry.url }}</a>
+    {% else %}
+      <span class="muted">none</span>
+    {% endif %}
+  </dd>
+  <dt>Username</dt>
+  <dd>{{ secret.username }}</dd>
+  <dt>Password</dt>
+  <dd>
+    <details>
+      <summary>Show password</summary>
+      <code>{{ secret.password }}</code>
+    </details>
+  </dd>
+  <dt>Notes</dt>
+  <dd class="notes">{{ secret.notes }}</dd>
+</dl>
+<p><a href="/vault">Back to vault</a></p>
+{% endblock %}
