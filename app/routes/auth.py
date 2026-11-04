@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app import crypto, sessions
 from app.db import User, get_db
+from app.logs import log_event
 from app.templating import templates
 
 router = APIRouter()
@@ -17,6 +18,7 @@ DUMMY_HASH = crypto.hash_password("dummy password")
 
 
 def login_error(request: Request, username: str, error: str):
+    log_event(request, "login", "failure", username=username, reason=error)
     context = {"error": error, "username": username}
     return templates.TemplateResponse(request, "login.html", context, status_code=400)
 
@@ -49,6 +51,7 @@ def register(
         error = "This username is taken."
 
     if error:
+        log_event(request, "register", "failure", username=username, reason=error)
         context = {"error": error, "username": username}
         return templates.TemplateResponse(request, "register.html", context, status_code=400)
 
@@ -59,6 +62,7 @@ def register(
     )
     db.add(user)
     db.commit()
+    log_event(request, "register", "success", username=username)
     return RedirectResponse("/login?registered=1", status_code=303)
 
 
@@ -92,6 +96,7 @@ def login(
     key = crypto.derive_key(password, user.key_salt)
     sessions.delete_session(request.cookies.get(sessions.COOKIE_NAME))
     sid = sessions.create_session(user.id, user.username, key)
+    log_event(request, "login", "success", username=username)
 
     response = RedirectResponse("/", status_code=303)
     sessions.set_cookie(response, sid)
@@ -101,8 +106,10 @@ def login(
 @router.post("/logout")
 def logout(request: Request, csrf_token: str = Form()):
     if not sessions.csrf_valid(request, csrf_token):
+        log_event(request, "logout", "failure", reason="csrf")
         return RedirectResponse("/", status_code=303)
 
+    log_event(request, "logout", "success")
     sessions.delete_session(request.cookies.get(sessions.COOKIE_NAME))
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie(sessions.COOKIE_NAME, secure=True, httponly=True, samesite="strict")

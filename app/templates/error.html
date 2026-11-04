@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ message }}</h1>
+<p class="muted">Error code {{ status_code }}. Reference {{ request.state.request_id }}.</p>
+<p><a href="/">Back to start</a></p>
+{% endblock %}

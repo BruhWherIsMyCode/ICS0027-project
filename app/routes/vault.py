@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session as DbSession
 
 from app import crypto, sessions
 from app.db import Entry, get_db
+from app.logs import log_event
 from app.sessions import Session, require_user
 from app.templating import templates
 
@@ -78,6 +79,7 @@ def create_entry(
 ):
     error = validate(request, form)
     if error:
+        log_event(request, "entry_create", "failure", reason=error)
         context = {
             "heading": "New entry",
             "action": "/vault/new",
@@ -98,6 +100,7 @@ def create_entry(
     )
     db.add(entry)
     db.commit()
+    log_event(request, "entry_create", "success", entry_id=entry_id)
     return RedirectResponse(f"/vault/{entry_id}", status_code=303)
 
 
@@ -110,6 +113,7 @@ def view_entry(
 ):
     entry = get_entry(db, entry_id, session.user_id)
     secret = crypto.decrypt(session.key, entry.nonce, entry.ciphertext, entry.id)
+    log_event(request, "entry_view", "success", entry_id=entry.id)
     context = {"entry": entry, "secret": secret}
     return templates.TemplateResponse(request, "entry.html", context)
 
@@ -139,6 +143,7 @@ def update_entry(
     entry = get_entry(db, entry_id, session.user_id)
     error = validate(request, form)
     if error:
+        log_event(request, "entry_update", "failure", entry_id=entry.id, reason=error)
         context = {
             "heading": "Edit entry",
             "action": f"/vault/{entry.id}/edit",
@@ -151,6 +156,7 @@ def update_entry(
     entry.url = form.url.strip()
     entry.nonce, entry.ciphertext = crypto.encrypt(session.key, secret_fields(form), entry.id)
     db.commit()
+    log_event(request, "entry_update", "success", entry_id=entry.id)
     return RedirectResponse(f"/vault/{entry.id}", status_code=303)
 
 
@@ -168,4 +174,5 @@ def delete_entry(
 
     db.delete(entry)
     db.commit()
+    log_event(request, "entry_delete", "success", entry_id=entry_id)
     return RedirectResponse("/vault", status_code=303)
