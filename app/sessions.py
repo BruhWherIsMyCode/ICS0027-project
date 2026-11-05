@@ -63,6 +63,12 @@ def delete_session(sid: str):
     sessions.pop(sid, None)
 
 
+def delete_user_sessions(user_id: int):
+    for sid, session in list(sessions.items()):
+        if session.user_id == user_id:
+            sessions.pop(sid, None)
+
+
 def set_cookie(response, sid: str):
     response.set_cookie(COOKIE_NAME, sid, secure=True, httponly=True, samesite="strict")
 

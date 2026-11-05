@@ -13,6 +13,7 @@
     <nav>
       {% if session.user_id %}
         <span>{{ session.username }}</span>
+        <a href="/settings/password">Settings</a>
         <form method="post" action="/logout">
           <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
           <button type="submit" class="link">Log out</button>

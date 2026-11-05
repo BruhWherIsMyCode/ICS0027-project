@@ -9,7 +9,7 @@ from starlette.exceptions import HTTPException
 
 from app.db import Base, engine
 from app.logs import log_event
-from app.routes import auth, vault
+from app.routes import auth, settings, vault
 from app.sessions import SessionMiddleware
 from app.templating import templates
 
@@ -37,6 +37,7 @@ app.add_middleware(SessionMiddleware)
 app.mount("/static", StaticFiles(directory=os.path.join("app", "static")), name="static")
 app.include_router(auth.router)
 app.include_router(vault.router)
+app.include_router(settings.router)
 
 
 def error_page(request: Request, status_code: int):
