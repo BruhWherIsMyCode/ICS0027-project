@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Two-factor authentication</h1>
+{% if error %}<p class="error">{{ error }}</p>{% endif %}
+<form method="post" action="/settings/mfa" class="card">
+  <input type="hidden" name="csrf_token" value="{{ request.state.session.csrf_token }}">
+  {% if enabled %}
+    <p>Two-factor authentication is on. Enter your master password and a current code to turn it off.</p>
+  {% else %}
+    <p>Scan the code with an authenticator app, then enter your master password and the 6-digit code it shows.</p>
+    <img src="{{ qr }}" alt="QR code for the authenticator app">
+    <p class="muted">Or you can enter this key by hand: <code>{{ secret }}</code></p>
+  {% endif %}
+  <label>Master password
+    <input type="password" name="password" required maxlength="1024" autocomplete="current-password">
+  </label>
+  <label>6-digit code
+    <input name="code" required pattern="[0-9]{6}" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+  </label>
+  <button type="submit">{% if enabled %}Turn off{% else %}Turn on{% endif %}</button>
+</form>
+{% endblock %}

@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
-from app import crypto, sessions
+from app import crypto, mfa, sessions
 from app.db import User, get_db
 from app.logs import log_event
 from app.templating import templates
@@ -21,6 +21,12 @@ def login_error(request: Request, username: str, error: str):
     log_event(request, "login", "failure", username=username, reason=error)
     context = {"error": error, "username": username}
     return templates.TemplateResponse(request, "login.html", context, status_code=400)
+
+
+def mfa_error(request: Request, error: str):
+    log_event(request, "login_mfa", "failure", reason=error)
+    context = {"error": error}
+    return templates.TemplateResponse(request, "login_mfa.html", context, status_code=400)
 
 
 @router.get("/register")
@@ -92,11 +98,55 @@ def login(
         sessions.record_failed_login(username)
         return login_error(request, username, "Invalid username or password.")
 
-    sessions.clear_failed_logins(username)
     key = crypto.derive_key(password, user.key_salt)
     sessions.delete_session(request.cookies.get(sessions.COOKIE_NAME))
-    sid = sessions.create_session(user.id, user.username, key)
-    log_event(request, "login", "success", username=username)
+    if user.mfa_enabled:
+        sid = sessions.create_session(user.id, user.username, key, mfa_pending=True)
+        log_event(request, "login", "mfa_required", username=username)
+        target = "/login/mfa"
+    else:
+        sessions.clear_failed_logins(username)
+        sid = sessions.create_session(user.id, user.username, key)
+        log_event(request, "login", "success", username=username)
+        target = "/"
+
+    response = RedirectResponse(target, status_code=303)
+    sessions.set_cookie(response, sid)
+    return response
+
+
+@router.get("/login/mfa")
+def mfa_form(request: Request):
+    if not request.state.session.mfa_pending:
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(request, "login_mfa.html")
+
+
+@router.post("/login/mfa")
+def mfa_login(
+    request: Request,
+    code: str = Form(max_length=10),
+    csrf_token: str = Form(),
+    db: DbSession = Depends(get_db),
+):
+    session = request.state.session
+    if not session.mfa_pending:
+        return RedirectResponse("/login", status_code=303)
+    if not sessions.csrf_valid(request, csrf_token):
+        return mfa_error(request, "The form expired. Please try again.")
+    if sessions.is_locked(session.username):
+        return mfa_error(request, "Too many failed attempts. Try again in 15 minutes.")
+
+    user = db.get(User, session.user_id)
+    secret = mfa.decrypt_secret(session.key, user)
+    if not mfa.verify(secret, code):
+        sessions.record_failed_login(session.username)
+        return mfa_error(request, "Invalid code.")
+
+    sessions.clear_failed_logins(session.username)
+    sessions.delete_session(request.cookies.get(sessions.COOKIE_NAME))
+    sid = sessions.create_session(user.id, user.username, session.key)
+    log_event(request, "login_mfa", "success", username=user.username)
 
     response = RedirectResponse("/", status_code=303)
     sessions.set_cookie(response, sid)

@@ -3,7 +3,7 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DbSession
 
-from app import crypto, sessions
+from app import crypto, mfa, sessions
 from app.db import Entry, User, get_db
 from app.logs import log_event
 from app.routes.auth import MIN_PASSWORD_LENGTH
@@ -54,6 +54,9 @@ def change_password(
     for entry in entries:
         secret = crypto.decrypt(session.key, entry.nonce, entry.ciphertext, entry.id)
         entry.nonce, entry.ciphertext = crypto.encrypt(new_key, secret, entry.id)
+    if user.mfa_enabled:
+        totp_secret = mfa.decrypt_secret(session.key, user)
+        mfa.encrypt_secret(new_key, user, totp_secret)
     user.password_hash = crypto.hash_password(new_password)
     user.key_salt = new_salt
     db.commit()
@@ -65,3 +68,70 @@ def change_password(
     response = RedirectResponse("/settings/password?changed=1", status_code=303)
     sessions.set_cookie(response, sid)
     return response
+
+
+def mfa_page(request: Request, session: Session, user: User, error: str | None = None):
+    context = {"enabled": user.mfa_enabled, "error": error}
+    if not user.mfa_enabled:
+        if session.totp_setup is None:
+            session.totp_setup = mfa.new_secret()
+        context["secret"] = session.totp_setup
+        context["qr"] = mfa.qr_code(session.totp_setup, user.username)
+    status_code = 400 if error else 200
+    return templates.TemplateResponse(request, "mfa.html", context, status_code=status_code)
+
+
+def mfa_settings_error(request: Request, session: Session, user: User, error: str):
+    log_event(request, "mfa_change", "failure", reason=error)
+    return mfa_page(request, session, user, error)
+
+
+@router.get("/settings/mfa")
+def mfa_settings(
+    request: Request,
+    session: Session = Depends(require_user),
+    db: DbSession = Depends(get_db),
+):
+    user = db.get(User, session.user_id)
+    return mfa_page(request, session, user)
+
+
+@router.post("/settings/mfa")
+def change_mfa(
+    request: Request,
+    password: str = Form(max_length=1024),
+    code: str = Form(max_length=10),
+    csrf_token: str = Form(),
+    session: Session = Depends(require_user),
+    db: DbSession = Depends(get_db),
+):
+    user = db.get(User, session.user_id)
+    if not sessions.csrf_valid(request, csrf_token):
+        return mfa_settings_error(request, session, user, "The form expired. Please try again.")
+    if sessions.is_locked(session.username):
+        return mfa_settings_error(request, session, user, "Too many failed attempts. Try again in 15 minutes.")
+    if not crypto.verify_password(user.password_hash, password):
+        sessions.record_failed_login(session.username)
+        return mfa_settings_error(request, session, user, "The master password is wrong.")
+
+    if user.mfa_enabled:
+        secret = mfa.decrypt_secret(session.key, user)
+    else:
+        secret = session.totp_setup
+    if secret is None or not mfa.verify(secret, code):
+        sessions.record_failed_login(session.username)
+        return mfa_settings_error(request, session, user, "Invalid code.")
+
+    if user.mfa_enabled:
+        user.mfa_enabled = False
+        user.totp_nonce = None
+        user.totp_ciphertext = None
+        event = "mfa_disable"
+    else:
+        mfa.encrypt_secret(session.key, user, secret)
+        user.mfa_enabled = True
+        session.totp_setup = None
+        event = "mfa_enable"
+    db.commit()
+    log_event(request, event, "success")
+    return RedirectResponse("/settings/mfa", status_code=303)

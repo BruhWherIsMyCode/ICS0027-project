@@ -24,3 +24,5 @@ On Linux or macOS, activate with - `source .venv/bin/activate`.
 Open https://127.0.0.1:8443/ and accept the self-signed certificate warning.
 
 There are optional settings in `.env.example`.
+
+If you ran an older version, delete `vault.db` once. The users table has new columns for two-factor login.

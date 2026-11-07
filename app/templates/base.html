@@ -11,9 +11,10 @@
   <header>
     <a class="brand" href="/">Password Manager</a>
     <nav>
-      {% if session.user_id %}
+      {% if session.user_id and not session.mfa_pending %}
         <span>{{ session.username }}</span>
-        <a href="/settings/password">Settings</a>
+        <a href="/settings/password">Password</a>
+        <a href="/settings/mfa">Two-factor</a>
         <form method="post" action="/logout">
           <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
           <button type="submit" class="link">Log out</button>

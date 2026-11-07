@@ -18,6 +18,8 @@ class Session:
     user_id: int | None = None
     username: str | None = None
     key: bytes | None = None
+    mfa_pending: bool = False
+    totp_setup: str | None = None
     created_at: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
 
@@ -40,10 +42,10 @@ def remove_expired():
             sessions.pop(sid, None)
 
 
-def create_session(user_id=None, username=None, key=None) -> str:
+def create_session(user_id=None, username=None, key=None, mfa_pending=False) -> str:
     remove_expired()
     sid = secrets.token_urlsafe(32)
-    sessions[sid] = Session(secrets.token_urlsafe(32), user_id, username, key)
+    sessions[sid] = Session(secrets.token_urlsafe(32), user_id, username, key, mfa_pending)
     return sid
 
 
@@ -80,7 +82,7 @@ def csrf_valid(request: Request, token: str) -> bool:
 
 def require_user(request: Request) -> Session:
     session = request.state.session
-    if session.user_id is None:
+    if session.user_id is None or session.mfa_pending:
         raise HTTPException(status_code=303, headers={"Location": "/login"})
     return session
 

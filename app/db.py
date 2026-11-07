@@ -24,6 +24,9 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(32), unique=True)
     password_hash: Mapped[str]
     key_salt: Mapped[bytes]
+    mfa_enabled: Mapped[bool] = mapped_column(default=False)
+    totp_nonce: Mapped[bytes | None] = mapped_column(default=None)
+    totp_ciphertext: Mapped[bytes | None] = mapped_column(default=None)
 
 
 class Entry(Base):

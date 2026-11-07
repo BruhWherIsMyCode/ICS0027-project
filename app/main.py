@@ -15,7 +15,7 @@ from app.templating import templates
 
 SECURITY_HEADERS = {
     "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; "
-    "img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'",
+    "img-src 'self' data:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'",
     "Strict-Transport-Security": "max-age=31536000",
     "X-Frame-Options": "DENY",
     "X-Content-Type-Options": "nosniff",
@@ -79,6 +79,7 @@ async def validation_error(request: Request, error: RequestValidationError):
 
 @app.get("/")
 def index(request: Request):
-    if request.state.session.user_id:
+    session = request.state.session
+    if session.user_id and not session.mfa_pending:
         return RedirectResponse("/vault", status_code=303)
     return RedirectResponse("/login", status_code=303)
