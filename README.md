@@ -5,6 +5,8 @@ a key derived from the user's master password.
 
 [Progress note](docs/checkpoint2-progress.md)
 
+[Security test results](docs/security-tests.md)
+
 ## Running locally
 
 You need Python 3.12 or newer.
